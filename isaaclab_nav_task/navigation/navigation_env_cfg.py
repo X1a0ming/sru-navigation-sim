@@ -417,6 +417,7 @@ class NavigationEnvCfg(ManagerBasedRLEnvCfg):
     curriculum: CurriculumCfg = CurriculumCfg()
     # Observation delay configuration
     delay_cfg: ObservationDelayManagerCfg = ObservationDelayManagerCfg()
+    robot_name: str | None = None
 
     def __post_init__(self):
         """Post initialization."""

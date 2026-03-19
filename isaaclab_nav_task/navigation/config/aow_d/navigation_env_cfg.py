@@ -17,15 +17,7 @@ from isaaclab_nav_task.navigation.assets import ANYMAL_D_ON_WHEELS_CFG  # isort:
 class AowDNavigationEnvCfg(NavigationEnvCfg):
     def __post_init__(self):
         super().__post_init__()
-
-        from isaaclab_nav_task.navigation.mdp.observations import initialize_depth_noise_generator
-        from isaaclab_nav_task.navigation.mdp.depth_utils.camera_config import get_camera_config
-
-        initialize_depth_noise_generator(robot_name="aow_d", use_jit_precompiled=False)
-
-        camera_config = get_camera_config("aow_d")
-        CAMERA_RESOLUTION = camera_config.resolution
-
+        self.robot_name = "aow_d"
         self.scene.robot = ANYMAL_D_ON_WHEELS_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
         self.scene.terrain.max_init_terrain_level = 10

@@ -27,11 +27,9 @@ class NavigationEnv(ManagerBasedRLEnv):
     cfg: NavigationEnvCfg
 
     def load_managers(self):
-        """Load managers with delay manager initialization.
+        from isaaclab_nav_task.navigation.mdp.observations import initialize_depth_noise_generator
+        initialize_depth_noise_generator(robot_name=self.cfg.robot_name, use_jit_precompiled=False, device=self.device)
 
-        The delay_manager is created before other managers are loaded,
-        ensuring observations can access it during initialization.
-        """
         # Create the delay manager before loading other managers
         # At this point, self.num_envs and self.device are available via scene
         self.delay_manager = ObservationDelayManager(

@@ -86,23 +86,42 @@ def _update_depth_window(camera_name: str, depth_tensor: torch.Tensor, height: i
     except Exception as e:
         print(f"Error updating depth window for {camera_name}: {e}")
 
-
-def _ensure_depth_noise_generator_initialized(
+def initialize_depth_noise_generator(
     camera_config: Optional[CameraConfig] = None,
+    robot_name: Optional[str] = None,
     use_jit_precompiled: bool = True,
     feature_dim: int = 64,
+    device: Optional[torch.device] = None,
 ):
-    """Ensure the depth noise generator is initialized with the correct configuration.
+    """Initialize the depth noise generator with specific configuration.
 
-    This is called automatically by observation functions that need depth encoding.
-    If not explicitly initialized via initialize_depth_noise_generator(), it will use defaults.
+    This function should be called in the environment's __post_init__() to set up
+    the depth encoder before any observations are computed.
 
     Args:
-        camera_config: The camera configuration to use. If None, uses DEFAULT_CAMERA_CONFIG.
-        use_jit_precompiled: Whether to use JIT compilation for faster inference.
-        feature_dim: Feature dimension for the encoder output.
+        camera_config: The camera configuration to use. If None and robot_name is provided,
+                      uses the config for that robot. If both are None, uses DEFAULT_CAMERA_CONFIG.
+        robot_name: Name of the robot (e.g., 'b2w', 'aow_d'). If provided and
+                   camera_config is None, automatically loads the appropriate camera config.
+        use_jit_precompiled: Whether to use JIT compilation for faster inference. Defaults to True.
+        feature_dim: Feature dimension for the encoder output. Defaults to 64.
+        device: Device to run the model on.
+
+    Examples:
+        # Using robot name (recommended for multi-robot training)
+        initialize_depth_noise_generator(robot_name="b2w")
+
+        # Using explicit camera config
+        initialize_depth_noise_generator(camera_config=ZEDX_CAMERA_CONFIG)
     """
     global DEPTH_NOISE_GENERATOR, JIT_DEPTH_NOISE_GENERATOR, use_jit, min_depth, max_depth
+
+    # If camera_config not provided, try to get it from robot_name
+    if camera_config is None and robot_name is not None:
+        camera_config = get_camera_config(robot_name, use_default_fallback=False)
+
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Only initialize if not already done
     if DEPTH_NOISE_GENERATOR is not None:
@@ -129,7 +148,7 @@ def _ensure_depth_noise_generator_initialized(
     DEPTH_NOISE_GENERATOR = DepthNoiseEncoder(
         feature_dim=feature_dim,
         camera_config=config,
-    ).to(torch.device("cuda"))
+    ).to(device)
     DEPTH_NOISE_GENERATOR.eval()
 
     # Create JIT version for inference (optional optimization)
@@ -152,39 +171,6 @@ def _ensure_depth_noise_generator_initialized(
 
     print("  Depth noise generator initialized successfully")
     print("=" * 80)
-
-
-def initialize_depth_noise_generator(
-    camera_config: Optional[CameraConfig] = None,
-    robot_name: Optional[str] = None,
-    use_jit_precompiled: bool = True,
-    feature_dim: int = 64,
-):
-    """Initialize the depth noise generator with specific configuration.
-
-    This function should be called in the environment's __post_init__() to set up
-    the depth encoder before any observations are computed.
-
-    Args:
-        camera_config: The camera configuration to use. If None and robot_name is provided,
-                      uses the config for that robot. If both are None, uses DEFAULT_CAMERA_CONFIG.
-        robot_name: Name of the robot (e.g., 'b2w', 'aow_d'). If provided and
-                   camera_config is None, automatically loads the appropriate camera config.
-        use_jit_precompiled: Whether to use JIT compilation for faster inference. Defaults to True.
-        feature_dim: Feature dimension for the encoder output. Defaults to 64.
-
-    Examples:
-        # Using robot name (recommended for multi-robot training)
-        initialize_depth_noise_generator(robot_name="b2w")
-
-        # Using explicit camera config
-        initialize_depth_noise_generator(camera_config=ZEDX_CAMERA_CONFIG)
-    """
-    # If camera_config not provided, try to get it from robot_name
-    if camera_config is None and robot_name is not None:
-        camera_config = get_camera_config(robot_name, use_default_fallback=False)
-
-    _ensure_depth_noise_generator_initialized(camera_config, use_jit_precompiled, feature_dim)
 
 
 # ============================================================================
@@ -382,9 +368,6 @@ def depth_image_prefect(env, sensor_cfg):
     Returns:
         The encoded depth image features.
     """
-    # Ensure encoder is initialized
-    _ensure_depth_noise_generator_initialized()
-
     depth_camera = env.scene.sensors[sensor_cfg.name]
 
     # Get depth image tensor
@@ -427,9 +410,6 @@ def depth_image_noisy_delayed(
     Returns:
         The delayed encoded depth image features.
     """
-    # Ensure encoder is initialized
-    _ensure_depth_noise_generator_initialized()
-
     depth_camera = env.scene.sensors[sensor_cfg.name]
 
     # Get depth image tensor

@@ -23,15 +23,7 @@ WHEEL_JOINT_NAMES = [".*foot_joint"]
 class B2WNavigationEnvCfg(NavigationEnvCfg):
     def __post_init__(self):
         super().__post_init__()
-
-        from isaaclab_nav_task.navigation.mdp.observations import initialize_depth_noise_generator
-        from isaaclab_nav_task.navigation.mdp.depth_utils.camera_config import get_camera_config
-
-        initialize_depth_noise_generator(robot_name="b2w", use_jit_precompiled=False)
-
-        camera_config = get_camera_config("b2w")
-        CAMERA_RESOLUTION = camera_config.resolution
-
+        self.robot_name = "b2w"
         self.scene.robot = B2W_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
         self.scene.raycast_camera.prim_path = "{ENV_REGEX_NS}/Robot/base_link"

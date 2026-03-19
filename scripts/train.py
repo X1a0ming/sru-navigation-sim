@@ -44,10 +44,24 @@ parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
 parser.add_argument("--max_iterations", type=int, default=None, help="RL Policy training iterations.")
 parser.add_argument("--run_name", type=str, default=None, help="Name of the wandb run (appended to log directory).")
+parser.add_argument("--experiment_name", type=str, default=None, help="Name of the experiment folder.")
+parser.add_argument("--resume", action="store_true", default=False, help="Whether to resume from a checkpoint.")
+parser.add_argument("--load_run", type=str, default=None, help="Name of the run folder to resume from.")
+parser.add_argument("--checkpoint", type=str, default=None, help="Checkpoint file name/pattern to resume from.")
+parser.add_argument(
+    "--logger", type=str, default=None, choices={"wandb", "tensorboard", "neptune"}, help="Logger module to use."
+)
+parser.add_argument(
+    "--log_project_name", type=str, default=None, help="Project name for wandb/neptune logging."
+)
+parser.add_argument(
+    "--distributed", action="store_true", default=False, help="Run training with multiple GPUs or nodes."
+)
 
 # Append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 args_cli, hydra_args = parser.parse_known_args()
+sys.argv = [sys.argv[0]] + hydra_args
 
 # always enable cameras to record video
 if args_cli.video:
@@ -96,33 +110,92 @@ def main():
         agent_cfg.seed = args_cli.seed
     if args_cli.max_iterations is not None:
         agent_cfg.max_iterations = args_cli.max_iterations
+    if args_cli.experiment_name is not None:
+        agent_cfg.experiment_name = args_cli.experiment_name
     if args_cli.run_name is not None:
         agent_cfg.run_name = args_cli.run_name
+    if args_cli.logger is not None:
+        agent_cfg.logger = args_cli.logger
+    if args_cli.resume:
+        agent_cfg.resume = True
+    if args_cli.load_run is not None:
+        agent_cfg.load_run = args_cli.load_run
+    if args_cli.checkpoint is not None:
+        agent_cfg.load_checkpoint = args_cli.checkpoint
+    if getattr(agent_cfg, "logger", None) in {"wandb", "neptune"} and args_cli.log_project_name is not None:
+        agent_cfg.wandb_project = args_cli.log_project_name
+        agent_cfg.neptune_project = args_cli.log_project_name
+
+    # set environment seed before env creation
+    env_cfg.seed = agent_cfg.seed
+
+    world_rank = 0
+    if args_cli.distributed:
+        env_cfg.sim.device = f"cuda:{app_launcher.local_rank}"
+        agent_cfg.device = f"cuda:{app_launcher.local_rank}"
+        world_rank = app_launcher.global_rank
+
+        # set seed to have diversity in different threads
+        seed = agent_cfg.seed + world_rank
+        env_cfg.seed = seed
+        agent_cfg.seed = seed
+
+        # Only enable logging (wandb/tensorboard) on the main process
+        if world_rank != 0:
+            agent_cfg.logger = None  # Disable logger for non-main processes
 
     # Create the environment
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
-    # Wrap the environment
-    env = RslRlVecEnvWrapper(env)
-
     # Specify log directory
     log_root_path = os.path.join("logs", "rsl_rl", agent_cfg.experiment_name)
     log_root_path = os.path.abspath(log_root_path)
     print(f"[INFO] Logging experiment in directory: {log_root_path}")
     # Specify run directory based on timestamp
     log_dir = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    print(f"Exact experiment name requested from command line: {log_dir}")
     if agent_cfg.run_name:
         log_dir += f"_{agent_cfg.run_name}"
     log_dir = os.path.join(log_root_path, log_dir)
 
-    # Create runner
-    runner = OnPolicyRunner(env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device)
+    # save resume path before creating a new run dir
+    resume_path = None
+    if agent_cfg.resume:
+        resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
+
+    # wrap for video recording
+    if args_cli.video:
+        video_kwargs = {
+            "video_folder": os.path.join(log_dir, "videos", "train"),
+            "step_trigger": lambda step: step % args_cli.video_interval == 0,
+            "video_length": args_cli.video_length,
+            "disable_logger": True,
+        }
+        print("[INFO] Recording videos during training.")
+        print_dict(video_kwargs, nesting=4)
+        env = gym.wrappers.RecordVideo(env, **video_kwargs)
+
+    # Wrap the environment
+    if hasattr(agent_cfg, "clip_actions"):
+        env = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)
+    else:
+        env = RslRlVecEnvWrapper(env)
+
+    # Create runner (only global rank-0 writes logs/checkpoints)
+    runner_log_dir = log_dir if world_rank == 0 else None
+    runner = OnPolicyRunner(env, agent_cfg.to_dict(), log_dir=runner_log_dir, device=agent_cfg.device)
     # Write git state to log
     runner.add_git_repo_to_log(__file__)
-    # Save configuration
-    dump_yaml(os.path.join(log_dir, "params", "env.yaml"), env_cfg)
-    dump_yaml(os.path.join(log_dir, "params", "agent.yaml"), agent_cfg)
-    dump_pickle(os.path.join(log_dir, "params", "env.pkl"), env_cfg)
-    dump_pickle(os.path.join(log_dir, "params", "agent.pkl"), agent_cfg)
+
+    # Load checkpoint when resume is enabled
+    if resume_path is not None:
+        print(f"[INFO]: Loading model checkpoint from: {resume_path}")
+        runner.load(resume_path)
+    # Save configuration on main process only
+    if world_rank == 0:
+        dump_yaml(os.path.join(log_dir, "params", "env.yaml"), env_cfg)
+        dump_yaml(os.path.join(log_dir, "params", "agent.yaml"), agent_cfg)
+        dump_pickle(os.path.join(log_dir, "params", "env.pkl"), env_cfg)
+        dump_pickle(os.path.join(log_dir, "params", "agent.pkl"), agent_cfg)
 
     # Run training
     runner.learn(num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=True)
