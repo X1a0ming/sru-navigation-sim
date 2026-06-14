@@ -37,9 +37,9 @@ from .terrain_constants import (
 )
 
 # Terrain generation (requires Isaac Sim)
-from .hf_terrains_maze_cfg import HfMazeTerrainCfg
-from .hf_terrains_maze import maze_terrain
-from .maze_config import MAZE_TERRAIN_CFG
+from .hf_terrains_maze_cfg import HfBranchingCorridorsTerrainCfg, HfMazeTerrainCfg, HfRandomMazeTerrainCfg
+from .hf_terrains_maze import branching_corridors_terrain, maze_terrain, random_maze_terrain
+from .maze_config import BRANCHING_CORRIDORS_TERRAIN_CFG, MAZE_TERRAIN_CFG, RANDOM_MAZE_TERRAIN_CFG
 
 __all__ = [
     # Patches
@@ -57,7 +57,13 @@ __all__ = [
     "CELL_PIXELS",
     # Terrain configs
     "HfMazeTerrainCfg",
+    "HfRandomMazeTerrainCfg",
+    "HfBranchingCorridorsTerrainCfg",
     "MAZE_TERRAIN_CFG",
+    "RANDOM_MAZE_TERRAIN_CFG",
+    "BRANCHING_CORRIDORS_TERRAIN_CFG",
     # Terrain functions
     "maze_terrain",
+    "random_maze_terrain",
+    "branching_corridors_terrain",
 ]

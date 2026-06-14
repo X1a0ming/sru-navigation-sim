@@ -56,6 +56,18 @@ class RslRlPpoActorCriticCfg:
     height_input_dims: tuple[int, int, int] = (64, 7, 7)
     """Encoded height scan feature shape as (C, H, W). Default is (64, 7, 7) for 64*7*7=3136 features."""
 
+    cache_num_slots: int = 16
+    """Number of slots in Self-Cache policies."""
+
+    cache_key_dim: int = 64
+    """Self-Cache key dimension."""
+
+    cache_value_dim: int = 64
+    """Self-Cache value/readout dimension."""
+
+    cache_gate_init: float = 0.02
+    """Initial residual actor gate for Self-Cache policies."""
+
 
 @configclass
 class RslRlPpoAlgorithmCfg:
@@ -102,6 +114,21 @@ class RslRlPpoAlgorithmCfg:
 
     max_grad_norm: float = MISSING
     """The maximum gradient norm."""
+
+    future_return_coef: float = 0.0
+    """Coefficient for Self-Cache future-return auxiliary prediction."""
+
+    future_return_horizons: list[int] = None
+    """Future-return horizons used by Self-Cache auxiliary heads."""
+
+    write_sparsity_coef: float = 0.0
+    """Coefficient for Self-Cache write sparsity regularization."""
+
+    cache_write_target: float = 0.1
+    """Target average write gate for Self-Cache policies."""
+
+    residual_action_l2_coef: float = 0.0
+    """Coefficient for Self-Cache residual action L2 regularization."""
 
 
 @configclass

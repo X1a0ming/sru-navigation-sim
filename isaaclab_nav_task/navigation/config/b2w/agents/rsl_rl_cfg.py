@@ -124,3 +124,63 @@ class B2WNavPPORunnerDevCfg(B2WNavPPORunnerCfg):
         self.max_iterations = 300
         self.experiment_name = "b2w_navigation_ppo_dev"
         self.logger = "tensorboard"
+
+
+@configclass
+class B2WNavPpoDeltaSRURunnerCfg(B2WNavPPORunnerCfg):
+    """PPO runner configuration for B2W navigation with the Delta-SRU policy."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.experiment_name = "b2w_navigation_deltasru_ppo"
+        self.policy.class_name = "ActorCriticDeltaSRU"
+        self.policy.rnn_type = "lstm_sru"
+
+
+@configclass
+class B2WNavPpoDeltaSRURunnerDevCfg(B2WNavPpoDeltaSRURunnerCfg):
+    """Development configuration for B2W Delta-SRU PPO with reduced iterations."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.max_iterations = 300
+        self.experiment_name = "b2w_navigation_deltasru_ppo_dev"
+        self.logger = "tensorboard"
+
+
+B2WNavDeltaSRUPPORunnerCfg = B2WNavPpoDeltaSRURunnerCfg
+B2WNavDeltaSRUPPORunnerDevCfg = B2WNavPpoDeltaSRURunnerDevCfg
+
+
+@configclass
+class B2WNavPpoSelfCachedDeltaSRURunnerCfg(B2WNavPpoDeltaSRURunnerCfg):
+    """PPO runner configuration for B2W navigation with Self-Cached Delta-SRU."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.experiment_name = "b2w_navigation_self_cached_deltasru_ppo"
+        self.policy.class_name = "ActorCriticSelfCachedDeltaSRU"
+        self.policy.cache_num_slots = 16
+        self.policy.cache_key_dim = 64
+        self.policy.cache_value_dim = 64
+        self.policy.cache_gate_init = 0.02
+        self.algorithm.future_return_coef = 0.05
+        self.algorithm.future_return_horizons = [8, 16, 32, 64]
+        self.algorithm.write_sparsity_coef = 0.01
+        self.algorithm.cache_write_target = 0.1
+        self.algorithm.residual_action_l2_coef = 0.001
+
+
+@configclass
+class B2WNavPpoSelfCachedDeltaSRURunnerDevCfg(B2WNavPpoSelfCachedDeltaSRURunnerCfg):
+    """Development configuration for B2W Self-Cached Delta-SRU PPO."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.max_iterations = 300
+        self.experiment_name = "b2w_navigation_self_cached_deltasru_ppo_dev"
+        self.logger = "tensorboard"
+
+
+B2WNavSelfCachedDeltaSRUPPORunnerCfg = B2WNavPpoSelfCachedDeltaSRURunnerCfg
+B2WNavSelfCachedDeltaSRUPPORunnerDevCfg = B2WNavPpoSelfCachedDeltaSRURunnerDevCfg

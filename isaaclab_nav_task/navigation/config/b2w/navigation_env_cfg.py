@@ -6,12 +6,14 @@
 """B2W specific configuration for navigation environment."""
 
 import os
+import copy
 
 from isaaclab.utils import configclass
 from isaaclab.managers import SceneEntityCfg
 
 from isaaclab_nav_task.navigation.navigation_env_cfg import NavigationEnvCfg
 import isaaclab_nav_task.navigation.mdp as mdp
+from isaaclab_nav_task.terrains import RANDOM_MAZE_TERRAIN_CFG
 
 from isaaclab_nav_task.navigation.assets import B2W_CFG, ISAACLAB_NAV_TASKS_ASSETS_DIR  # isort: skip
 
@@ -75,6 +77,73 @@ class B2WNavigationEnvCfg_PLAY(B2WNavigationEnvCfg):
             self.scene.terrain.terrain_generator.num_rows = 2
             self.scene.terrain.terrain_generator.num_cols = 2
 
+        self.observations.policy.enable_corruption = False
+        self.events.base_external_force_torque = None
+        self.events.push_robot = None
+
+
+@configclass
+class B2WNavigationEnvCfg_COMPLEX_MAZE_HARD(B2WNavigationEnvCfg):
+    def __post_init__(self):
+        super().__post_init__()
+        self.scene.terrain.terrain_generator = copy.deepcopy(RANDOM_MAZE_TERRAIN_CFG)
+        self.scene.terrain.terrain_generator.difficulty_range = [0.8, 1.0]
+        self.scene.terrain.terrain_generator.curriculum = False
+        for terrain_cfg in self.scene.terrain.terrain_generator.sub_terrains.values():
+            terrain_cfg.proportion = 0.0
+        self.scene.terrain.terrain_generator.sub_terrains["random_maze"].proportion = 1.0
+        self.scene.terrain.max_init_terrain_level = 10
+
+
+@configclass
+class B2WNavigationEnvCfg_COMPLEX_MAZE_HARD_DEV(B2WNavigationEnvCfg_COMPLEX_MAZE_HARD):
+    def __post_init__(self):
+        super().__post_init__()
+        self.scene.terrain.terrain_generator.num_rows = 1
+        self.scene.terrain.terrain_generator.num_cols = 8
+
+
+@configclass
+class B2WNavigationEnvCfg_COMPLEX_MAZE_HARD_PLAY(B2WNavigationEnvCfg_COMPLEX_MAZE_HARD):
+    def __post_init__(self):
+        super().__post_init__()
+        self.scene.num_envs = 20
+        self.scene.env_spacing = 2.5
+        self.scene.terrain.max_init_terrain_level = None
+        self.scene.terrain.terrain_generator.num_rows = 1
+        self.scene.terrain.terrain_generator.num_cols = 4
+        self.observations.policy.enable_corruption = False
+        self.events.base_external_force_torque = None
+        self.events.push_robot = None
+
+
+@configclass
+class B2WNavigationEnvCfg_RANDOM_MAZE(B2WNavigationEnvCfg):
+    def __post_init__(self):
+        super().__post_init__()
+        self.scene.terrain.terrain_generator = copy.deepcopy(RANDOM_MAZE_TERRAIN_CFG)
+        self.scene.terrain.terrain_generator.difficulty_range = [0.5, 1.0]
+        self.scene.terrain.terrain_generator.curriculum = False
+        self.scene.terrain.max_init_terrain_level = 10
+
+
+@configclass
+class B2WNavigationEnvCfg_RANDOM_MAZE_DEV(B2WNavigationEnvCfg_RANDOM_MAZE):
+    def __post_init__(self):
+        super().__post_init__()
+        self.scene.terrain.terrain_generator.num_rows = 1
+        self.scene.terrain.terrain_generator.num_cols = 8
+
+
+@configclass
+class B2WNavigationEnvCfg_RANDOM_MAZE_PLAY(B2WNavigationEnvCfg_RANDOM_MAZE):
+    def __post_init__(self):
+        super().__post_init__()
+        self.scene.num_envs = 20
+        self.scene.env_spacing = 2.5
+        self.scene.terrain.max_init_terrain_level = None
+        self.scene.terrain.terrain_generator.num_rows = 1
+        self.scene.terrain.terrain_generator.num_cols = 4
         self.observations.policy.enable_corruption = False
         self.events.base_external_force_torque = None
         self.events.push_robot = None

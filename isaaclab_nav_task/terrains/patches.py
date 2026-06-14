@@ -328,6 +328,14 @@ def _patch_terrain_generator():
         cfg = cfg.copy()
         cfg.difficulty = float(difficulty)
         cfg.seed = self.cfg.seed
+        if hasattr(cfg, "terrain_row"):
+            cfg.terrain_row = getattr(self, "_current_sub_row", None)
+        if hasattr(cfg, "terrain_col"):
+            cfg.terrain_col = getattr(self, "_current_sub_col", None)
+        if hasattr(cfg, "terrain_num_rows"):
+            cfg.terrain_num_rows = self.cfg.num_rows
+        if hasattr(cfg, "terrain_num_cols"):
+            cfg.terrain_num_cols = self.cfg.num_cols
 
         # Clear non-serializable fields for hashing
         for attr in _HEIGHT_FIELD_ATTRS:
@@ -385,9 +393,51 @@ def _patch_terrain_generator():
 
         return mesh, origin
 
+    def _patched_generate_random_terrains(self):
+        """Add terrains based on randomly sampled difficulty parameter with tile context."""
+        proportions = np.array([sub_cfg.proportion for sub_cfg in self.cfg.sub_terrains.values()])
+        proportions /= np.sum(proportions)
+        sub_terrains_cfgs = list(self.cfg.sub_terrains.values())
+
+        for index in range(self.cfg.num_rows * self.cfg.num_cols):
+            sub_row, sub_col = np.unravel_index(index, (self.cfg.num_rows, self.cfg.num_cols))
+            sub_index = self.np_rng.choice(len(proportions), p=proportions)
+            difficulty = self.np_rng.uniform(*self.cfg.difficulty_range)
+            self._current_sub_row = int(sub_row)
+            self._current_sub_col = int(sub_col)
+            mesh, origin = self._get_terrain_mesh(difficulty, sub_terrains_cfgs[sub_index])
+            self._add_sub_terrain(mesh, origin, sub_row, sub_col, sub_terrains_cfgs[sub_index])
+        self._current_sub_row = None
+        self._current_sub_col = None
+
+    def _patched_generate_curriculum_terrains(self):
+        """Add curriculum terrains with tile context."""
+        proportions = np.array([sub_cfg.proportion for sub_cfg in self.cfg.sub_terrains.values()])
+        proportions /= np.sum(proportions)
+        sub_indices = []
+        for index in range(self.cfg.num_cols):
+            sub_index = np.min(np.where(index / self.cfg.num_cols + 0.001 < np.cumsum(proportions))[0])
+            sub_indices.append(sub_index)
+        sub_indices = np.array(sub_indices, dtype=np.int32)
+        sub_terrains_cfgs = list(self.cfg.sub_terrains.values())
+
+        for sub_col in range(self.cfg.num_cols):
+            for sub_row in range(self.cfg.num_rows):
+                lower, upper = self.cfg.difficulty_range
+                difficulty = (sub_row + self.np_rng.uniform()) / self.cfg.num_rows
+                difficulty = lower + (upper - lower) * difficulty
+                self._current_sub_row = int(sub_row)
+                self._current_sub_col = int(sub_col)
+                mesh, origin = self._get_terrain_mesh(difficulty, sub_terrains_cfgs[sub_indices[sub_col]])
+                self._add_sub_terrain(mesh, origin, sub_row, sub_col, sub_terrains_cfgs[sub_indices[sub_col]])
+        self._current_sub_row = None
+        self._current_sub_col = None
+
     # Apply patches
     TerrainGenerator.__init__ = _patched_init
     TerrainGenerator._get_terrain_mesh = _patched_get_terrain_mesh
+    TerrainGenerator._generate_random_terrains = _patched_generate_random_terrains
+    TerrainGenerator._generate_curriculum_terrains = _patched_generate_curriculum_terrains
 
 
 def _patch_terrain_importer():

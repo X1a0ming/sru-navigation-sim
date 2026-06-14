@@ -66,8 +66,8 @@ class HfMazeTerrainCfg(HfTerrainBaseCfg):
     cell_size: float = 2.0
     """Size of each cell in the maze grid (in meters)."""
 
-    wall_height: float = 1.5
-    """Height of the walls (in meters). Defaults to 1.5."""
+    wall_height: float = 2.4
+    """Height of the walls in meters."""
 
     # =========================================================================
     # Terrain Features
@@ -108,4 +108,97 @@ class HfMazeTerrainCfg(HfTerrainBaseCfg):
     If None, will create a new unseeded generator (non-reproducible).
     """
 
+    terrain_row: Optional[int] = None
+    """Sub-terrain row index set by the patched terrain generator."""
 
+    terrain_col: Optional[int] = None
+    """Sub-terrain column index set by the patched terrain generator."""
+
+    terrain_num_rows: Optional[int] = None
+    """Total number of sub-terrain rows set by the patched terrain generator."""
+
+    terrain_num_cols: Optional[int] = None
+    """Total number of sub-terrain columns set by the patched terrain generator."""
+
+
+@configclass
+class HfRandomMazeTerrainCfg(HfMazeTerrainCfg):
+    """Thin-wall random maze terrain for long-memory navigation."""
+
+    function = hf_terrains_maze.random_maze_terrain
+
+    wall_width: float = 0.15
+    """Width of maze wall segments in meters."""
+
+    corridor_width: float = 1.35
+    """Fallback clear width of entrance, exit, and stair corridors in meters."""
+
+    corridor_width_range: tuple[float, float] | None = (1.2, 1.6)
+    """Optional range to uniformly sample clear corridor width in meters."""
+
+    exit_count_range: tuple[int, int] = (2, 5)
+    """Inclusive range for the number of outside-connected maze exits."""
+
+    num_stairs: int = 0
+    """Maximum number of large pyramid patches to add to each maze tile."""
+
+    step_height_range: tuple[float, float] = (0.15, 0.18)
+    """Minimum and maximum height increment per platform terrace in meters."""
+
+    step_width_range: tuple[float, float] = (0.28, 0.35)
+    """Minimum and maximum horizontal width of each platform edge terrace in meters."""
+
+    pyramid_patch_size_range: tuple[float, float] = (8.0, 14.0)
+    """Minimum and maximum side length of each elevated platform patch in meters."""
+
+    pyramid_levels_range: tuple[int, int] = (6, 10)
+    """Inclusive range for the number of edge terraces before the elevated platform."""
+
+    pyramid_platform_fraction_range: tuple[float, float] = (0.35, 0.55)
+    """Fraction of the patch side length reserved as the flat elevated top platform."""
+
+    stairs_platform_width: float = 0.9
+    """Deprecated compatibility field for older corridor stair generation."""
+
+    stairs_platform_cells: tuple[int, int] = (2, 5)
+    """Deprecated compatibility field for older corridor stair generation."""
+
+
+@configclass
+class HfBranchingCorridorsTerrainCfg(HfMazeTerrainCfg):
+    """WFC branching-corridor height field terrain."""
+
+    function = hf_terrains_maze.branching_corridors_terrain
+
+    grid_size: tuple[int, int] = (12, 12)
+    """Size of the WFC tile grid in (rows, columns)."""
+
+    tile_size: float = 2.0
+    """Size of each WFC tile in meters."""
+
+    wall_height: float = 3.0
+    """Height of corridor walls in meters."""
+
+    wall_thickness: float = 0.2
+    """Thickness of corridor walls in meters."""
+
+    level_height: float = 0.5
+    """Height of the second corridor level in meters."""
+
+    step_height: float = 0.1
+    """Vertical increment used when rasterizing stair tiles."""
+
+    stair_weight: float = 0.12
+    """Relative WFC sampling weight for stair connector tiles."""
+
+    min_stair_distance: int = 4
+    """Minimum spacing target for stair tiles retained for API compatibility."""
+
+    spine_x: int = 3
+    """Column of the seeded E-branch spine."""
+
+    top_y: int = 2
+    """Top row of the seeded E-branch spine."""
+
+    branch_length: int = 3
+    """Length of each seeded branch extending from the spine."""
